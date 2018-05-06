@@ -8,7 +8,7 @@ The setup is pretty straight forward. All you need is a raspberry pi  running [h
 ![pcb](https://github.com/kakaki/homebridge-mcp-contact-sensor/raw/master/pcb.png)
 
 #### Install via npm (>= v8.x.x)
-`npm install ## homebridge-mcp-contact-sensor -g`
+`npm install homebridge-mcp-contact-sensor -g`
 
 
 #### Edit the ./homebridge/config.json
