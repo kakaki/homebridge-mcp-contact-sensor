@@ -1,0 +1,28 @@
+{
+  "name": "homebridge-mcp-contact-sensor",
+  "version": "0.0.1",
+  "description": "a homebridge(https://github.com/nfarina/homebridge) plugin for a contact sensor and motion sensor via mcp23017 i2c port for Raspberry Pi.",
+  "keywords": [
+    "homebridge-plugin",
+    "raspberrypi",
+    "raspberry-pi",
+    "mcp23017",
+    "i2c"
+  ],
+  "homepage": "https://github.com/kakaki/homebridge-mcp-contact-sensor",
+  "author": "Kakaki",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/kakaki/homebridge-mcp-contact-sensor"
+  },
+  "bugs": {
+    "url": "http://github.com/kakaki/homebridge-mcp-contact-sensor/issues"
+  },
+  "engines": {
+    "node": ">=8.9.0",
+    "homebridge": ">=0.4.1"
+  },
+  "dependencies": {
+    "i2c-bus": "^3.1.0"
+  }
+}
