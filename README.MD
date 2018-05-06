@@ -1,15 +1,18 @@
+
 # MCP Contact and Motions Sensors
 
 A Homebridge Plugin for controlling your contact and motions sensors using chip mcp23017 port extender for Pi.
 
 The setup is pretty straight forward. All you need is a raspberry pi  running [homebridge](https://github.com/nfarina/homebridge). Chip(s) mcp23017 connected to i2c.
 
+![pcb](https://github.com/kakaki/homebridge-mcp-contact-sensor/raw/master/pcb.png)
+
 #### Install via npm (>= v8.x.x)
 `npm install ## homebridge-mcp-contact-sensor -g`
 
 
 #### Edit the ./homebridge/config.json
-You don't need that much to get started. Just set used i2c address(es) and in pins select multiple items with address, port (A, B) and used pin (0-7) for each device, add kind "motion" for motion sensor and empty for contact sensor.
+You don't need that much to get started. Just set used i2c address(es) and in pins array add multiple items with address, port (A, B) and pin (0-7) for each device, add kind "motion" for motion sensor and empty for contact sensor.
 Can add up to 16 devices with one mcp23017 chip, connect another for next 16 devices.
 
 ```
