@@ -1,6 +1,6 @@
 {
   "name": "homebridge-mcp-contact-sensor",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "a homebridge(https://github.com/nfarina/homebridge) plugin for a contact sensor and motion sensor via mcp23017 i2c port for Raspberry Pi.",
   "keywords": [
     "homebridge-plugin",

@@ -45,6 +45,9 @@ function mcpSensorsPlatform(log, config, api) {
 	this.pins = config.pins || {};
 	this.states = {};
 
+	this.AlarmState = Characteristic.SecuritySystemCurrentState.DISARM;
+	this.AlarmTargetState = Characteristic.SecuritySystemCurrentState.DISARM;
+
 	for (var a in this.addresses) {
 		var adr = this.addresses[a];
 		this.states[adr] = ["", ""];
@@ -68,7 +71,9 @@ mcpSensorsPlatform.prototype.configureAccessory = function (accessory) {
 mcpSensorsPlatform.prototype.didFinishLaunching = function () {
   this.log("Platform didFinishLaunching: " + this.pins + "'...");
   // Add or update accessories defined in config.json
-  for (var i in this.pins) this.addAccessory(this.pins[i]);
+  for (var i in this.pins) {
+	  this.addAccessory(this.pins[i]);
+  }
 
   this.log("Platform remove old accesories");
 
@@ -77,7 +82,7 @@ mcpSensorsPlatform.prototype.didFinishLaunching = function () {
     var accessory = this.accessories[name];
     if (!accessory.reachable) this.removeAccessory(accessory);
   }
-
+  
   this.log("Platform init i2c");
   
   for (var a in this.addresses) {
@@ -94,6 +99,10 @@ mcpSensorsPlatform.prototype.didFinishLaunching = function () {
 	}
     
     setInterval(function(sensors) {
+        
+    	var stateAlarmMotion = false;
+		var stateAlarmContants = false;
+    
 	    for (var a in sensors.addresses) {
 			sensors.address = parseInt(sensors.addresses[a], 16);
 			
@@ -112,46 +121,81 @@ mcpSensorsPlatform.prototype.didFinishLaunching = function () {
 			if (sensors.lastStateB!=sensors.stateB) {
 				console.log('MCP - ' + sensors.address.toString(16) +' change on PIN B: ' + sensors.stateB.toString(2)+' last: '+ sensors.lastStateB.toString(2));
 			}
-
+			
 			for (var i in sensors.pins) {			
 				var state ='';
 				var update=false;
-				if (sensors.pins[i].address==sensors.address) {
-					if (sensors.pins[i].port=='A') {
-						state=sensors.stateA;
-						update=sensors.lastStateA!=sensors.stateA;
-					}
-					else {
-						state=sensors.stateB;
-						update=sensors.lastStateB!=sensors.stateB;
-					}
+				if (sensors.pins[i].kind=='security') {
+					//todo: reading keypad for arm/disarm system
+				}
+				else {				
+					if (sensors.pins[i].address==sensors.address) {
+						if (sensors.pins[i].port=='A') {
+							state=sensors.stateA;
+							update=sensors.lastStateA!=sensors.stateA;
+						}
+						else {
+							state=sensors.stateB;
+							update=sensors.lastStateB!=sensors.stateB;
+						}
 			
-					if (update) {
+						if (update) {
 
-						var pinInt = Math.pow(2, sensors.pins[i].pin);
-						var pinState = (state & pinInt) != 0;
+							var pinInt = Math.pow(2, sensors.pins[i].pin);
+							var pinState = (state & pinInt) != 0;
 					
-//						console.log('MCP - update ' +sensors.address.toString(16) +' '+sensors.pins[i].port+ sensors.pins[i].pin + ' '+pinInt.toString()+' '+pinState.toString()+' '+state.toString(2)); 																			
+	//						console.log('MCP - update ' +sensors.address.toString(16) +' '+sensors.pins[i].port+ sensors.pins[i].pin + ' '+pinInt.toString()+' '+pinState.toString()+' '+state.toString(2)); 																			
 							
-						  var accessory = sensors.accessories[sensors.pins[i].name];
-						  if (accessory) {			  
+							  var accessory = sensors.accessories[sensors.pins[i].name];
+							  if (accessory) {			  
 						  
-							  if (sensors.pins[i].kind=='motion') {
-								accessory.getService(Service.MotionSensor)
-									.getCharacteristic(Characteristic.MotionDetected)
-									.setValue(pinState);
-							  }
-							  else 
-								accessory.getService(Service.ContactSensor)
-									.getCharacteristic(Characteristic.ContactSensorState)
-									.setValue(pinState);
-							}			
-						}		
+								  if (sensors.pins[i].kind=='motion') {
+									accessory.getService(Service.MotionSensor)
+										.getCharacteristic(Characteristic.MotionDetected)
+										.setValue(pinState);
+									
+									if (pinState) {
+										stateAlarmMotion = true;
+									}																					
+								  }
+								  else {
+									accessory.getService(Service.ContactSensor)
+										.getCharacteristic(Characteristic.ContactSensorState)
+										.setValue(pinState);										
+										
+									if (pinState) {
+										stateAlarmContants = true;
+									}	
+								}			
+							}		
+						}
 					}
 				}
 			
 			sensors.states[sensors.addresses[a]][0] = sensors.stateA;
 			sensors.states[sensors.addresses[a]][1] = sensors.stateB;					
+		}
+		
+		if (sensors.SecuritySystem) {
+
+			//logs
+			stateAl = stateAlarmMotion || stateAlarmContants ?  Characteristic.SecuritySystemCurrentState.TRIGGER : sensors.AlarmTargetState;
+										
+			if (stateAl!=sensors.AlarmState) {		
+				console.log("alarm state change " + stateAlarmMotion+" "+stateAlarmContants+" "+sensors.AlarmTargetState);
+			}
+			
+			//alarm away logic:
+			if (sensors.AlarmState==Characteristic.SecuritySystemCurrentState.AWAY_ARM)  {						        
+				stateAl = stateAlarmMotion || stateAlarmContants ?  Characteristic.SecuritySystemCurrentState.TRIGGER: sensors.AlarmTargetState;
+										
+				if (stateAl!=sensors.AlarmState) {
+					console.log("setting alarm for '" + sensors.pins[i].name + "'...");
+					sensors.AlarmState=stateAl;
+					sensors.SecuritySystem.setCharacteristic(Characteristic.SecuritySystemCurrentState, sensors.AlarmState);
+					}
+				}					
+			}
 		}
 	      	
 	}, this.updateInterval, this);
@@ -175,7 +219,11 @@ mcpSensorsPlatform.prototype.addAccessory = function (data) {
         this.log("setting MotionSensor for '" + data.name + "'...");
 	    accessory.addService(Service.MotionSensor, data.name);
 	}
-	else  {
+	else if (data.kind=='security') {
+        this.log("setting Security for '" + data.name + "'...");
+	    this.SecuritySystem = accessory.addService(Service.SecuritySystem, data.name);
+	}
+	else {
 		this.log("setting ContactSensor for '" + data.name + "'...");
 	    accessory.addService(Service.ContactSensor, data.name);
 	}
@@ -183,8 +231,8 @@ mcpSensorsPlatform.prototype.addAccessory = function (data) {
     // New accessory is always reachable
     accessory.reachable = true;
 
-    // Setup listeners for different switch events
-    this.setService(accessory);
+	// Setup listeners for different switch events
+	this.setService(accessory);
 
     // Register new accessory in HomeKit
     this.api.registerPlatformAccessories("homebridge-mcp-sensors-platform", "mcpSensors", [accessory]);
@@ -202,6 +250,7 @@ mcpSensorsPlatform.prototype.addAccessory = function (data) {
   cache.name = data.name;
   cache.port = data.port;
   cache.pin = data.pin;
+  cache.kind = data.kind;
 
   // Retrieve initial state
   this.getInitState(accessory);
@@ -219,11 +268,22 @@ mcpSensorsPlatform.prototype.removeAccessory = function (accessory) {
 
 // Method to setup listeners for different events
 mcpSensorsPlatform.prototype.setService = function (accessory) {
-//  accessory.getService(Service.ContactSensor)
-//  .getCharacteristic(Characteristic.ContactSensorState)
-//  .setValue(false);
-//    .on('get', this.getPowerState.bind(this, accessory.context))
-//    .on('set', this.setPowerState.bind(this, accessory.context));
+
+	this.log(accessory.context.name + " setService "+ accessory.context.kind);
+	
+	if (accessory.context.kind=='security') {
+	
+		this.SecuritySystem = accessory.getService(Service.SecuritySystem);
+	
+		this.SecuritySystem.getCharacteristic(Characteristic.SecuritySystemCurrentState)
+			.on("get", this.getAlarmCurrentState.bind(this))
+			.setValue(this.AlarmState);
+		  
+		this.SecuritySystem.getCharacteristic(Characteristic.SecuritySystemTargetState)
+			.on("get", this.getAlarmTargetState.bind(this))
+			.on("set", this.setAlarmTargetState.bind(this))
+			.setValue(this.AlarmTargetState);				
+	}
 
   accessory.on('identify', this.identify.bind(this, accessory.context));
 }
@@ -248,4 +308,26 @@ mcpSensorsPlatform.prototype.getInitState = function (accessory) {
 mcpSensorsPlatform.prototype.identify = function (thisSwitch, paired, callback) {
   this.log(thisSwitch.name + " identify requested!");
   callback();
+}
+
+//alarm
+
+mcpSensorsPlatform.prototype.getAlarmCurrentState = function(callback) {
+	
+	this.log("MCP-Alarm get current state "+this.AlarmState);
+	callback(null, this.AlarmState);
+};
+
+mcpSensorsPlatform.prototype.getAlarmTargetState = function(callback) {
+
+	this.log("MCP-Alarm get target state "+this.AlarmTargetState);
+	callback(null, this.AlarmTargetState);
+};
+
+mcpSensorsPlatform.prototype.setAlarmTargetState = function(state, callback) {
+	this.log("MCP-Alarm set target state to "+state);
+	this.AlarmTargetState = state;
+	this.AlarmState = state;
+	this.SecuritySystem.setCharacteristic(Characteristic.SecuritySystemCurrentState, state);
+	callback(null, state);
 }
